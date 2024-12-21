@@ -1,6 +1,7 @@
 
 using AccountService.Business;
 using AccountService.Data;
+using AccountService.MessageBroker;
 using Microsoft.EntityFrameworkCore;
 
 namespace AccountService
@@ -21,6 +22,9 @@ namespace AccountService
 
             // Adding Bussiness Logic Layer
             builder.Services.AddTransient<IBusinessLayer, BusinessLayer>();
+
+            //RabbitMQ Configuration
+            builder.Services.AddScoped(typeof(IQueuePublisher<>), typeof(QueuePublisher<>));
 
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

@@ -1,4 +1,5 @@
 ﻿using AccountService.Business;
+using AccountService.MessageBroker;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SharedProject.DTOs;
@@ -10,9 +11,13 @@ namespace AccountService.Controllers
     public class AccountController : ControllerBase
     {
         private readonly IBusinessLayer _businessLayer;
-        public AccountController(IBusinessLayer businessLayer)
+        private readonly IQueuePublisher<string> _queuePublisher;
+
+
+        public AccountController(IBusinessLayer businessLayer, IQueuePublisher<string> queuePublisher)
         {
             _businessLayer = businessLayer;
+            _queuePublisher = queuePublisher;
         }
 
 
@@ -23,6 +28,7 @@ namespace AccountService.Controllers
             var resp = _businessLayer.CreateNewAccount(accountRegistrationDTO);
             if (resp.Status)
             {
+                _queuePublisher.PublishMessageAsync("event_account_created");
                 return Ok(resp);
             }
 
