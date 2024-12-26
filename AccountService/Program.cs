@@ -1,6 +1,7 @@
 
 using AccountService.Business;
 using AccountService.Data;
+using AccountService.gRPC.Services;
 using AccountService.MessageBroker;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ namespace AccountService
             // Add services to the container.
 
             builder.Services.AddControllers();
+            builder.Services.AddGrpc();
 
             // Adding database
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -41,6 +43,10 @@ namespace AccountService
             }
 
             app.UseHttpsRedirection();
+
+            // Grpc Service 
+            app.MapGrpcService<AccountsRpcService>();
+
 
             app.UseAuthorization();
 

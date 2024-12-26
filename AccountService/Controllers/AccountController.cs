@@ -2,6 +2,7 @@
 using AccountService.MessageBroker;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using SharedProject.DTOs;
 
 namespace AccountService.Controllers
@@ -12,12 +13,14 @@ namespace AccountService.Controllers
     {
         private readonly IBusinessLayer _businessLayer;
         private readonly IQueuePublisher<string> _queuePublisher;
+        private readonly IQueuePublisher<AccountStatementRequestDTO> _queuePublisher2;
 
 
-        public AccountController(IBusinessLayer businessLayer, IQueuePublisher<string> queuePublisher)
+        public AccountController(IBusinessLayer businessLayer, IQueuePublisher<string> queuePublisher, IQueuePublisher<AccountStatementRequestDTO> queuePublisher2)
         {
             _businessLayer = businessLayer;
             _queuePublisher = queuePublisher;
+            _queuePublisher2 = queuePublisher2;
         }
 
 
@@ -28,7 +31,7 @@ namespace AccountService.Controllers
             var resp = _businessLayer.CreateNewAccount(accountRegistrationDTO);
             if (resp.Status)
             {
-                _queuePublisher.PublishMessageAsync("event_account_created");
+                PublishMessage("event_account_created", resp.Data);
                 return Ok(resp);
             }
 
@@ -78,9 +81,24 @@ namespace AccountService.Controllers
         [Route("statement/pdf")]
         public IActionResult GetPdfStatement([FromBody] AccountStatementRequestDTO accountStatementRequestDTO)
         {
-            return Ok();
+            _queuePublisher2.PublishAccountStatementPdfRequestAsync(accountStatementRequestDTO);
+            return Ok("PDF statement will be send to registered email address");
         }
 
+
+        #region Private region 
+
+        private void PublishMessage(string eventType, object data)
+        {
+            var messageToBroker = new
+            {
+                Event = eventType,
+                AccountDetails = data
+            };
+
+            _queuePublisher.PublishMessageAsync(JsonConvert.SerializeObject(messageToBroker));
+        }
+        #endregion
 
 
     }

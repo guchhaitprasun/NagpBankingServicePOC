@@ -186,7 +186,7 @@ namespace AccountService.Business
                                     .Transactions
                                     .Where(o => o.TransactionForAccountId == accountStatementRequestDTO.AccountNumber
                                     && o.DateTime >= accountStatementRequestDTO.StartDate && o.DateTime <= accountStatementRequestDTO.EndDate)
-                                    .Select(o => new
+                                    .Select(o => new TransactionInfoDTO
                                     {
                                         AccountNumber = accountStatementRequestDTO.AccountNumber,
                                         TransactionType = o.TransactionType,

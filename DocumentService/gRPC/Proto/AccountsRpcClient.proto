@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+
+option csharp_namespace = "DocumentService";
+
+service AccountStatement {
+  rpc FetchAccountStatement (JsonRequest) returns (JsonResponse);
+}
+
+message JsonRequest {
+  string json = 1;
+}
+
+message JsonResponse {
+  string statement = 1;
+}
