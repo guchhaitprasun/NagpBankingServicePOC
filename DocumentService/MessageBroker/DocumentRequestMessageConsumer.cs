@@ -7,65 +7,79 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace DocumentService.MessageBroker
 {
-    public class DocumentRequestMessageConsumer : IDocumentRequestMessageConsumer
+    public class DocumentRequestMessageConsumer : IDocumentRequestMessageConsumer, IDisposable
     {
-        private readonly BrokerConfiguration _accountCreationBrokerConfig;
+        private readonly BrokerConfiguration _consumerConfig;
+        private readonly BrokerConfiguration _producerConfig;
 
-        public DocumentRequestMessageConsumer()
+        private readonly IConnection brokerConnection;
+        private readonly IModel brokerChannell;
+        private bool _disposed = false;
+
+        public DocumentRequestMessageConsumer(BrokerConfiguration config, BrokerConfiguration producerConfig)
         {
-            _accountCreationBrokerConfig = new BrokerConfiguration
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest",
-                DocumentsQueue = "document_queue",
-                Exchange = "nagp_topic_exchange"
-            };
+            _consumerConfig = config;
+            _producerConfig = producerConfig;
+
+            brokerConnection = SetupRabbitMqConnection(config);
+            brokerChannell = SetupRabbitMqChannell(brokerConnection);
         }
 
         public void ListneForNewDocumentCreationRequest()
         {
-            using (IConnection connection = SetupRabbitMqConnection(_accountCreationBrokerConfig))
+            brokerChannell.QueueBind(_consumerConfig.DocumentsQueue, _consumerConfig.Exchange, _consumerConfig.DocumentsQueue, null);
+
+            var consumer = new EventingBasicConsumer(brokerChannell);
+
+            consumer.Received += (sender, args) =>
             {
-                using (IModel channell = SetupRabbitMqChannell(connection))
+                var body = args.Body.ToArray();
+                var message = Encoding.UTF8.GetString(body);
+                Console.WriteLine($"[x] Received New Notification:");
+
+                var resp = JsonConvert.DeserializeObject<AccountStatementRequestDTO>(message);
+
+                if (resp != null)
+                    ProcessPDFGeneration(resp);
+
+                else
+                    Console.WriteLine("Invalid Message Received");
+
+                Console.WriteLine(":::: Waiting for Next Message ::::");
+
+            };
+
+            // subscribe to the queue
+            brokerChannell.BasicConsume(_consumerConfig.DocumentsQueue, true, consumer);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this); // Suppress finalization to avoid redundant cleanup
+        }
+
+        // Protected implementation of Dispose
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
                 {
-                    // Exchange Configuration 
-                    channell.ExchangeDeclare(_accountCreationBrokerConfig.Exchange, ExchangeType.Topic);
-
-                    //Queue Configuration
-                    channell.QueueDeclare(queue: _accountCreationBrokerConfig.DocumentsQueue, durable: false, exclusive: false, autoDelete: false, arguments: null);
-
-                    channell.QueueBind(_accountCreationBrokerConfig.DocumentsQueue, _accountCreationBrokerConfig.Exchange, _accountCreationBrokerConfig.DocumentsQueue, null);
-
-                    var consumer = new EventingBasicConsumer(channell);
-
-                    consumer.Received += (sender, args) =>
-                    {
-                        var body = args.Body.ToArray();
-                        var message = Encoding.UTF8.GetString(body);
-                        Console.WriteLine($"[x] Received New Notification:");
-
-                        var resp = JsonConvert.DeserializeObject<AccountStatementRequestDTO>(message);
-
-                        if (resp != null)
-                            ProcessPDFGeneration(resp);
-
-                        else
-                            Console.WriteLine("Invalid Message Received");
-
-                        Console.WriteLine(":::: Waiting for Next Message ::::");
-
-                    };
-
-                    // subscribe to the queue
-                    channell.BasicConsume(_accountCreationBrokerConfig.DocumentsQueue, true, consumer);
+                    brokerChannell?.Dispose();
+                    brokerConnection?.Dispose();
                 }
+
+                _disposed = true;
             }
         }
+
+        #region Private Implementation
 
         private void ProcessPDFGeneration(AccountStatementRequestDTO pdfGenerationRequest)
         {
@@ -73,9 +87,14 @@ namespace DocumentService.MessageBroker
 
             var payload = JsonConvert.SerializeObject(pdfGenerationRequest);
 
-            accountRpcClientService.FetchAndGenerateAccountStatementPDF(payload);
-        }
+            var status = accountRpcClientService.FetchAndGenerateAccountStatementPDF(payload);
 
+            if (status)
+            {
+                IMessagePublisher<string> messagePublisher = new MessagePublisher<string>(_producerConfig);
+                messagePublisher.PublishMessageAsync($"New PDF Statement Generated for Account Number {pdfGenerationRequest.AccountNumber}");
+            }
+        }
 
         private IConnection SetupRabbitMqConnection(BrokerConfiguration brokerConfiguration)
         {
@@ -92,6 +111,14 @@ namespace DocumentService.MessageBroker
         private IModel SetupRabbitMqChannell(IConnection connection)
         {
             return connection.CreateModel();
+        }
+
+        #endregion
+
+        // Destructor (finalizer) for unmanaged cleanup
+        ~DocumentRequestMessageConsumer()
+        {
+            Dispose(false);
         }
     }
 }

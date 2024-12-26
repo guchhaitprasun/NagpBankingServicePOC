@@ -19,21 +19,30 @@ namespace DocumentService.gRPC.Client
             _gRPCServierURL = "https://localhost:44336";
         }
 
-        public void FetchAndGenerateAccountStatementPDF(string payload)
+        public bool FetchAndGenerateAccountStatementPDF(string payload)
         {
-            using (var channel = GetGrpcChannel())
+            try
             {
-                var client = new AccountStatement.AccountStatementClient(channel);
-
-                // Create a Raw JSON request
-                var Json = new JsonRequest
+                using (var channel = GetGrpcChannel())
                 {
-                    Json = payload
-                };
+                    var client = new AccountStatement.AccountStatementClient(channel);
 
-                Console.WriteLine("\n:::: Fetching Account Statement from Accounts Service using gRPC ::::");
-                var resp = client.FetchAccountStatement(Json);
-                GeneratePDF(resp);
+                    // Create a Raw JSON request
+                    var Json = new JsonRequest
+                    {
+                        Json = payload
+                    };
+
+                    Console.WriteLine("\n:::: Fetching Account Statement from Accounts Service using gRPC ::::");
+                    var resp = client.FetchAccountStatement(Json);
+                    GeneratePDF(resp);
+
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 
@@ -65,9 +74,6 @@ namespace DocumentService.gRPC.Client
 
             }
             Console.WriteLine(":::: PDF Generation End, Sending Notification to Notification Service 1 & 2 ::::");
-
-            IMessagePublisher<string> messagePublisher = new MessagePublisher<string>();
-            messagePublisher.PublishMessageAsync($"New PDF Statement Generated for Account Number {accountNo}");
         }
     }
 }

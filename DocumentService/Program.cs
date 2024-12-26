@@ -1,4 +1,5 @@
 ﻿using DocumentService.MessageBroker;
+using SharedProject.DTOs;
 
 namespace DocumentService
 {
@@ -12,11 +13,31 @@ namespace DocumentService
             Thread.Sleep(3000);
             Console.WriteLine("Service Up and Listning for new messeges from queue");
 
+
+            BrokerConfiguration consumerConfig = new BrokerConfiguration
+            {
+                HostName = "localhost",
+                UserName = "guest",
+                Password = "guest",
+                DocumentsQueue = "document_queue",
+                Exchange = "nagp_topic_exchange"
+            };
+
+            BrokerConfiguration publisherConfig = new BrokerConfiguration
+            {
+                HostName = "localhost",
+                UserName = "guest",
+                Password = "guest",
+                DocumentsQueue = "document_notification_queue",
+                Exchange = "nagp_fanout_exchange"
+            };
+
+            IDocumentRequestMessageConsumer consumer = new DocumentRequestMessageConsumer(consumerConfig, publisherConfig);
+
             while (true)
             {
                 try
                 {
-                    IDocumentRequestMessageConsumer consumer = new DocumentRequestMessageConsumer();
                     consumer.ListneForNewDocumentCreationRequest();
                 }
                 catch (Exception ex)

@@ -16,16 +16,9 @@ namespace DocumentService.MessageBroker
         private IModel channell;
 
 
-        public MessagePublisher()
+        public MessagePublisher(BrokerConfiguration config)
         {
-            brokerConfiguration = new BrokerConfiguration
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest",
-                DocumentsQueue = "document_notification_queue",
-                Exchange = "nagp_fanout_exchange"
-            };
+            brokerConfiguration = config;
         }
 
         public async Task PublishMessageAsync(T message)
@@ -38,7 +31,7 @@ namespace DocumentService.MessageBroker
                     channell.ExchangeDeclare(brokerConfiguration.Exchange, ExchangeType.Fanout, false, false, null);
 
                     //Queue Configuration
-                    channell.QueueDeclare(queue: brokerConfiguration.DocumentsQueue, durable: false, exclusive: false, autoDelete: false, arguments: null);
+                    //channell.QueueDeclare(queue: brokerConfiguration.DocumentsQueue, durable: false, exclusive: false, autoDelete: false, arguments: null);
 
                     var body = CreateBody(message);
 
